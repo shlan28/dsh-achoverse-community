@@ -2,3 +2,42 @@
 - insert:
     - id: achoverse-community
       name: 'dsh-achoverse-community'
+    # 抽屉助手专用预设：只有社区工具链，没有 shell / 文件读写。
+    # 用 config.local.json 里的 "agentPreset": "achoverse" 启用。
+    - id: preset-achoverse
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: achoverse
+        name: 'Achoverse 社区助手'
+        description: '只能通过社区接口读写板块、帖子与评论，没有 shell 和文件工具'
+        order: 2
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You are the Achoverse community assistant. You can read boards, posts and
+                comments and publish posts or comments through the community tool only.
+                You have no shell, no file access and no source code; never claim to have
+                inspected files.
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024

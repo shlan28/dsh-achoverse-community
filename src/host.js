@@ -82,7 +82,16 @@ function readChatSessions() {
   try {
     const data = JSON.parse(readFileSync(chatSessionsFile(), 'utf8'))
     if (!data || typeof data !== 'object' || Array.isArray(data)) return {}
-    return Object.fromEntries(Object.entries(data).filter(([accountId, sessionId]) => accountId && typeof sessionId === 'string' && sessionId))
+    const out = {}
+    for (const [accountId, value] of Object.entries(data)) {
+      if (!accountId) continue
+      // 兼容旧格式（accountId → sessionId 字符串）
+      if (typeof value === 'string' && value) out[accountId] = { sessionId: value, preset: null }
+      else if (value && typeof value.sessionId === 'string' && value.sessionId) {
+        out[accountId] = { sessionId: value.sessionId, preset: value.preset ?? null }
+      }
+    }
+    return out
   } catch {
     return {}
   }
@@ -159,18 +168,29 @@ export function apply(ctx, options = {}) {
   async function ensureChatSession(accountId) {
     const ctrl = sessionController()
     if (!ctrl) throw new Error('当前环境没有会话服务，无法对话')
-    if (chat.sessions[accountId]) return chat.sessions[accountId]
+    const preset = pluginConfig().agentPreset
+    const existing = chat.sessions[accountId]
+    // 预设变了就重开一条，避免沿用旧（完整能力）会话。
+    if (existing?.sessionId && (existing.preset || '') === preset) return existing.sessionId
     if (!chat.creating) {
       chat.creating = (async () => {
         const cwd = ctx.get('workingDirectory')?.defaultDirectory
-        // 预设由部署配置决定；没配就退回默认（完整）Agent。
-        const preset = pluginConfig().agentPreset
-        const value = await ctrl.create({ ...(cwd ? { cwd } : {}), ...(preset ? { agentPreset: preset } : {}) })
-        chat.sessions[accountId] = String(value.sessionId)
+        let value
+        try {
+          value = await ctrl.create({ ...(cwd ? { cwd } : {}), ...(preset ? { agentPreset: preset } : {}) })
+        } catch (error) {
+          // 配了受限预设就不能静默退回完整 Agent
+          throw new Error(
+            preset
+              ? `社区助手预设「${preset}」加载失败，请重载插件或检查 cordis.patch.yml：${error?.message || error}`
+              : error?.message || '创建会话失败',
+          )
+        }
+        chat.sessions[accountId] = { sessionId: String(value.sessionId), preset: preset || null }
         if (options.sessionStore) options.sessionStore.write(chat.sessions)
         else writeChatSessions(chat.sessions)
-        ctx.logger?.info?.(`[achoverse-community] 抽屉会话：${chat.sessions[accountId]}`)
-        return chat.sessions[accountId]
+        ctx.logger?.info?.(`[achoverse-community] 抽屉会话：${chat.sessions[accountId].sessionId}`)
+        return chat.sessions[accountId].sessionId
       })().finally(() => {
         chat.creating = null
       })
@@ -181,7 +201,7 @@ export function apply(ctx, options = {}) {
   /** 仅按已经验证的社区账号恢复其 DSH 会话历史。 */
   async function chatHistory(accountId, limit = 60) {
     const ctrl = sessionController()
-    const sessionId = chat.sessions[accountId]
+    const sessionId = chat.sessions[accountId]?.sessionId
     if (!ctrl || !sessionId) return { messages: [] }
     try {
       const page = await ctrl.events(
