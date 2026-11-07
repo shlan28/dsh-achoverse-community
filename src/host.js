@@ -8,7 +8,7 @@
 //   ACV_BASE_URL      社区地址，默认 http://127.0.0.1:8088
 //   ACV_SERVICE_TOKEN 社区服务令牌（写操作、绑定会话都要用）
 //   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken }
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -565,13 +565,15 @@ export function apply(ctx, options = {}) {
   ctx.effect(
     () => {
       const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'acv.mjs')
+      // 公开插件包不带 scripts/，没有 CLI 时不要在提示词里提它
+      const cliHint = existsSync(cli) ? ` (me / spaces / posts / read / search / post / comment / space-*)` : ''
       return ctx.get('systemPrompt')?.section({
         name: 'achoverse-community',
         order: 62,
         text: [
           'The user keeps an Achoverse community (boards, posts, comments).',
           'Use the `community` tool for reads (spaces, posts, read_post, search) and writes (post, comment).',
-          `Operate the community ONLY through the community tool or the CLI: \`node ${cli} <command>\` (me / spaces / posts / read / search / post / comment). Never edit this repository's code, the SQLite database, or server files to answer a community request, and never bypass the API.`,
+          `Operate the community ONLY through the community tool${existsSync(cli) ? ` or the CLI: \`node ${cli} <command>\`` : ''}${cliHint}. Never edit this repository's code, the SQLite database, or server files to answer a community request, and never bypass the API.`,
           'Publish directly when the user asks; do not print a draft unless they asked for one.',
           'Writing goes through the user\'s community account; if the tool reports they are not signed in, ask them to sign in inside the community panel.',
         ].join(' '),
