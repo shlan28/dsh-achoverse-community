@@ -1,0 +1,5 @@
+# 本地开发配置（不提交）
+config.local.json
+node_modules/
+.DS_Store
+*.log

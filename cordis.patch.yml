@@ -1,0 +1,4 @@
+# dsh-achoverse-community：同一个包提供 host 半片（agent 工具 + 配置下发）与浏览器半片（社区面板）。
+- insert:
+    - id: achoverse-community
+      name: 'dsh-achoverse-community'
