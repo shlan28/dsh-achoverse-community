@@ -44,6 +44,7 @@ function pluginConfig() {
   return {
     baseUrl: String(env('ACV_BASE_URL', file.baseUrl || 'http://127.0.0.1:8088')).replace(/\/$/, ''),
     serviceToken: String(env('ACV_SERVICE_TOKEN', file.serviceToken || '')),
+    agentPreset: String(file.agentPreset || '').trim(),
   }
 }
 
@@ -58,7 +59,21 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
+/** 把当前登录令牌写到插件目录，供 acv CLI 使用（0600，不进仓库）。 */
+function cliTokenFile() {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', '.acv-cli-token')
+}
+
+function writeCliToken(token) {
+  try {
+    writeFileSync(cliTokenFile(), String(token), { mode: 0o600 })
+  } catch {
+    // 写不进去时 CLI 仍可用 ACV_TOKEN
+  }
+}
+
 /** 按社区账户保存抽屉的 DSH 会话；旧的共享会话不自动归属给任何账户。 */
+
 function chatSessionsFile() {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '.chat-sessions.json')
 }
@@ -148,7 +163,9 @@ export function apply(ctx, options = {}) {
     if (!chat.creating) {
       chat.creating = (async () => {
         const cwd = ctx.get('workingDirectory')?.defaultDirectory
-        const value = await ctrl.create(cwd ? { cwd } : {})
+        // 预设由部署配置决定；没配就退回默认（完整）Agent。
+        const preset = pluginConfig().agentPreset
+        const value = await ctrl.create({ ...(cwd ? { cwd } : {}), ...(preset ? { agentPreset: preset } : {}) })
         chat.sessions[accountId] = String(value.sessionId)
         if (options.sessionStore) options.sessionStore.write(chat.sessions)
         else writeChatSessions(chat.sessions)
@@ -399,12 +416,20 @@ export function apply(ctx, options = {}) {
   )
 
   ctx.effect(
-    () =>
-      ctx.get('systemPrompt')?.section({
+    () => {
+      const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'acv.mjs')
+      return ctx.get('systemPrompt')?.section({
         name: 'achoverse-community',
         order: 62,
-        text: 'The user keeps an Achoverse community (boards, posts, comments). Use the community tool to read boards, posts and comments before answering, and to publish a post or a comment when the user asks for it — do not just print a draft unless they asked for one. Writing goes through the user\'s community account; if the tool reports that they are not signed in, ask them to sign in inside the community panel.',
-      }),
+        text: [
+          'The user keeps an Achoverse community (boards, posts, comments).',
+          'Use the `community` tool for reads (spaces, posts, read_post, search) and writes (post, comment).',
+          `Operate the community ONLY through the community tool or the CLI: \`node ${cli} <command>\` (me / spaces / posts / read / search / post / comment). Never edit this repository's code, the SQLite database, or server files to answer a community request, and never bypass the API.`,
+          'Publish directly when the user asks; do not print a draft unless they asked for one.',
+          'Writing goes through the user\'s community account; if the tool reports they are not signed in, ask them to sign in inside the community panel.',
+        ].join(' '),
+      })
+    },
     'achoverse-community: prompt section',
   )
 }
@@ -418,6 +443,7 @@ async function handleChat(ctx, req, res, { ensureChatSession, chat }) {
   chat.busy = true
   try {
     const accountId = await authenticatedAccount(body?.token)
+    writeCliToken(body.token)
 
     const ctrl = ctx.get('sessionController')
     if (!ctrl) return json(res, 503, { error: '当前环境没有会话服务' })
