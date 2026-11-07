@@ -59,6 +59,16 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
+/** 最近一次在抽屉登录的账号令牌；CLI 与任意 DSH 会话的写操作共用。 */
+function readAgentToken() {
+  if (process.env.ACV_TOKEN) return process.env.ACV_TOKEN.trim() || null
+  try {
+    return readFileSync(cliTokenFile(), 'utf8').trim() || null
+  } catch {
+    return null
+  }
+}
+
 /** 把当前登录令牌写到插件目录，供 acv CLI 使用（0600，不进仓库）。 */
 function cliTokenFile() {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '.acv-cli-token')
@@ -226,6 +236,20 @@ export function apply(ctx, options = {}) {
     if (!active || active.sessionId !== sessionId) return null
     const data = await callCommunity(`/api/ai/actor?sessionId=${encodeURIComponent(sessionId)}`)
     return data.accountId === active.accountId ? active.token : null
+  }
+
+  /** 当前轮次的令牌 → 本机缓存令牌；后者让任意 DSH 会话也能以用户身份写。 */
+  async function writeTokenFor(sessionId) {
+    const scoped = sessionId ? await userTokenFor(sessionId) : null
+    if (scoped) return scoped
+    const cached = readAgentToken()
+    if (!cached) return null
+    try {
+      const me = await callCommunity('/api/auth/me', { headers: { authorization: `Bearer ${cached}` } })
+      return me?.account?.id ? cached : null
+    } catch {
+      return null
+    }
   }
 
   // 只接管抽屉当前轮次的交互问题；其他会话仍交给 DSH 原生界面。
@@ -448,8 +472,8 @@ export function apply(ctx, options = {}) {
               return { posts: data.posts.map(compactPost) }
             }
             case 'post': {
-              const userToken = sessionId ? await userTokenFor(sessionId) : null
-              if (!userToken) return { ok: false, error: '当前会话未绑定已登录的社区用户，请在社区面板登录并使用助手抽屉' }
+              const userToken = await writeTokenFor(sessionId)
+              if (!userToken) return { ok: false, error: '本机还没有登录令牌：先在社区面板登录一次，或设置 ACV_TOKEN' }
               const spaces = await callCommunity('/api/spaces')
               const space = spaces.spaces.find(item => item.slug === args?.space || item.id === args?.space)
               if (!space) return { ok: false, error: `没有这个板块：${args?.space || '（空）'}` }
@@ -461,8 +485,8 @@ export function apply(ctx, options = {}) {
               return { ok: true, post: { id: data.post.id, title: data.post.title, space: space.title } }
             }
             case 'comment': {
-              const userToken = sessionId ? await userTokenFor(sessionId) : null
-              if (!userToken) return { ok: false, error: '当前会话未绑定已登录的社区用户，请在社区面板登录并使用助手抽屉' }
+              const userToken = await writeTokenFor(sessionId)
+              if (!userToken) return { ok: false, error: '本机还没有登录令牌：先在社区面板登录一次，或设置 ACV_TOKEN' }
               if (!args?.id) return { ok: false, error: '缺少帖子 id' }
               const data = await callCommunity(`/api/posts/${encodeURIComponent(args.id)}/comments`, {
                 method: 'POST',
@@ -474,8 +498,8 @@ export function apply(ctx, options = {}) {
             case 'space_update':
             case 'space_create':
             case 'space_archive': {
-              const userToken = sessionId ? await userTokenFor(sessionId) : null
-              if (!userToken) return { ok: false, error: '当前会话未绑定已登录的社区用户，请在社区面板登录并使用助手抽屉' }
+              const userToken = await writeTokenFor(sessionId)
+              if (!userToken) return { ok: false, error: '本机还没有登录令牌：先在社区面板登录一次，或设置 ACV_TOKEN' }
               const userHeaders = { 'content-type': 'application/json', authorization: `Bearer ${userToken}` }
               // 管理员接口按用户角色鉴权；普通成员会收到 403 原文。
               async function findSpace(reference) {
