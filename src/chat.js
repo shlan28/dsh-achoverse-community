@@ -12,6 +12,23 @@ function textOfMessage(message) {
     .trim()
 }
 
+/** 会话日志里的 user/message + assistant/message → 抽屉气泡。 */
+export function recordsToMessages(records) {
+  const messages = []
+  for (const record of records || []) {
+    const event = record?.event || record
+    if (!event) continue
+    if (event.type === 'user/message') {
+      const text = textOfMessage({ content: event.data?.content })
+      if (text) messages.push({ role: 'user', text })
+    } else if (event.type === 'assistant/message') {
+      const text = textOfMessage(event.data?.message)
+      if (text) messages.push({ role: 'assistant', text })
+    }
+  }
+  return messages
+}
+
 /** 一个 session 事件 → 若干 SSE 帧（可能为空）。 */
 export function sessionEventToFrames(event) {
   if (!event || typeof event !== 'object') return []

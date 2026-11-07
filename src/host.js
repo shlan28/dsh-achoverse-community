@@ -8,10 +8,10 @@
 //   ACV_BASE_URL      社区地址，默认 http://127.0.0.1:8088
 //   ACV_SERVICE_TOKEN 社区服务令牌（写操作、绑定会话都要用）
 //   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken }
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { runChatTurn } from './chat.js'
+import { recordsToMessages, runChatTurn } from './chat.js'
 import { fileURLToPath } from 'node:url'
 
 const PREFIX = '/community'
@@ -57,6 +57,28 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
+/** 抽屉会话 id 落盘，插件重载后还能接着聊同一条对话。 */
+function chatSessionFile() {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', '.chat-session.json')
+}
+
+function readChatSessionId() {
+  try {
+    const data = JSON.parse(readFileSync(chatSessionFile(), 'utf8'))
+    return typeof data?.sessionId === 'string' ? data.sessionId : null
+  } catch {
+    return null
+  }
+}
+
+function writeChatSessionId(sessionId) {
+  try {
+    writeFileSync(chatSessionFile(), JSON.stringify({ sessionId, at: Date.now() }))
+  } catch {
+    // 写不进去就退化成内存态，不影响对话
+  }
+}
+
 function rejectionOf(ctx, req) {
   const connection = ctx.get('connection')
   if (typeof connection?.requestRejection !== 'function') return 0
@@ -98,8 +120,8 @@ async function callCommunity(path, init = {}) {
 export const inject = ['webServer']
 
 export function apply(ctx) {
-  /** 抽屉专用的 DSH 会话：第一次对话时创建，之后复用。 */
-  const chat = { sessionId: null, creating: null }
+  /** 抽屉专用的 DSH 会话：第一次对话时创建，之后复用；id 落盘，插件重载也不换。 */
+  const chat = { sessionId: readChatSessionId(), creating: null }
 
   function sessionController() {
     return ctx.get('sessionController')
@@ -114,6 +136,7 @@ export function apply(ctx) {
         const cwd = ctx.get('workingDirectory')?.defaultDirectory
         const value = await ctrl.create(cwd ? { cwd } : {})
         chat.sessionId = String(value.sessionId)
+        writeChatSessionId(chat.sessionId)
         ctx.logger?.info?.(`[achoverse-community] 抽屉会话：${chat.sessionId}`)
         return chat.sessionId
       })().finally(() => {
@@ -121,6 +144,22 @@ export function apply(ctx) {
       })
     }
     return chat.creating
+  }
+
+  /** 从 DSH 会话日志里读最近的对话，抽屉重新打开时恢复。 */
+  async function chatHistory(limit = 60) {
+    const ctrl = sessionController()
+    const sessionId = chat.sessionId || readChatSessionId()
+    if (!ctrl || !sessionId) return { messages: [] }
+    try {
+      const page = await ctrl.events(
+        { address: { kind: 'session', sessionId }, maxMessages: limit },
+        new AbortController().signal,
+      )
+      return { messages: recordsToMessages(page?.records) }
+    } catch (error) {
+      return { messages: [], error: error?.message || '读取历史失败' }
+    }
   }
 
   async function actorFor(sessionId) {
@@ -144,6 +183,10 @@ export function apply(ctx) {
 
             if (route === '/config' && req.method === 'GET') {
               return json(res, 200, { baseUrl: baseUrl() })
+            }
+            if (route === '/ai/history' && (req.method === 'GET' || req.method === 'POST')) {
+              const history = await chatHistory()
+              return json(res, 200, history)
             }
             if (route === '/ai/chat' && req.method === 'POST') {
               return await handleChat(ctx, req, res, { ensureChatSession })
