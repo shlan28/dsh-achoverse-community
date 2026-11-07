@@ -159,7 +159,14 @@ export const inject = ['webServer']
 
 export function apply(ctx, options = {}) {
   /** 每个社区账号单独复用自己的 DSH 会话；运行中的轮次仍全局互斥。 */
-  const chat = { sessions: options.sessionStore?.read?.() ?? readChatSessions(), creating: null, active: null, busy: false }
+  const chat = {
+    sessions: options.sessionStore?.read?.() ?? readChatSessions(),
+    creating: null,
+    active: null,
+    busy: false,
+    // 测试可关掉令牌落盘，避免把假令牌写进插件目录
+    saveToken: options.saveCliToken ?? writeCliToken,
+  }
 
   function sessionController() {
     return ctx.get('sessionController')
@@ -351,22 +358,39 @@ export function apply(ctx, options = {}) {
       tools.register({
         name: 'community',
         description:
-          'Read and write the user\'s Achoverse community. Actions: "spaces" list boards; "posts" list recent posts (optionally one board via `space`); "read_post" read a post with comments; "search" find posts by keyword; "post" publish a post (needs `space`, `title`, `body`); "comment" reply to a post (needs `id`, `body`). Writing requires the user to be signed in inside the community panel.',
+          'Read and write the user\'s Achoverse community. Actions: "spaces" list boards; "posts" list recent posts (optionally one board via `space`); "read_post" read a post with comments; "search" find posts by keyword; "post" publish a post (needs `space`, `title`, `body`); "comment" reply to a post (needs `id`, `body`); "space_update" edit a board\'s title/subtitle/description/colors/zones (needs `space` plus the fields); "space_create" add a board (needs `title`); "space_archive" archive or restore a board (needs `space`, `archived`). Board actions run with the signed-in user\'s permissions, so a non-admin gets a refusal.',
         parameters: {
           type: 'object',
           additionalProperties: false,
           properties: {
             action: {
               type: 'string',
-              enum: ['spaces', 'posts', 'read_post', 'search', 'post', 'comment'],
+              enum: [
+                'spaces', 'posts', 'read_post', 'search', 'post', 'comment',
+                'space_update', 'space_create', 'space_archive',
+              ],
               description: 'Operation to perform.',
             },
-            space: { type: 'string', description: 'Board slug for "posts"/"post", such as notice, tech, lounge.' },
+            space: {
+              type: 'string',
+              description: 'Board slug or id, for "posts"/"post"/"space_update"/"space_archive".',
+            },
             id: { type: 'string', description: 'Post id for "read_post"/"comment".' },
             q: { type: 'string', description: 'Keyword for "search".' },
             title: { type: 'string', description: 'Post title for "post".' },
             body: { type: 'string', description: 'Markdown/plain text body for "post"/"comment".' },
             limit: { type: 'number', description: 'Max items, default 10.' },
+            subtitle: { type: 'string', description: 'One-line intro (<=60 chars) for "space_create"/"space_update".' },
+            description: { type: 'string', description: 'Longer board description (<=300 chars) for "space_create"/"space_update".' },
+            accent: { type: 'string', description: '#RRGGBB card gradient start for "space_create"/"space_update".' },
+            accentTo: { type: 'string', description: '#RRGGBB card gradient end for "space_create"/"space_update".' },
+            motif: { type: 'string', description: 'Cover motif for "space_create"/"space_update".' },
+            zones: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Where the board shows: home and/or arvr, for "space_create"/"space_update".',
+            },
+            archived: { type: 'boolean', description: 'true archives, false restores; for "space_archive".' },
           },
           required: ['action'],
         },
@@ -447,6 +471,65 @@ export function apply(ctx, options = {}) {
               })
               return { ok: true, comment: { id: data.comment?.id, postId: args.id } }
             }
+            case 'space_update':
+            case 'space_create':
+            case 'space_archive': {
+              const userToken = sessionId ? await userTokenFor(sessionId) : null
+              if (!userToken) return { ok: false, error: '当前会话未绑定已登录的社区用户，请在社区面板登录并使用助手抽屉' }
+              const userHeaders = { 'content-type': 'application/json', authorization: `Bearer ${userToken}` }
+              // 管理员接口按用户角色鉴权；普通成员会收到 403 原文。
+              async function findSpace(reference) {
+                const [publicList, adminList] = await Promise.all([
+                  callCommunity('/api/spaces').catch(() => ({ spaces: [] })),
+                  callCommunity('/api/admin/spaces', { headers: userHeaders }).catch(() => ({ spaces: [] })),
+                ])
+                return [...(adminList.spaces || []), ...(publicList.spaces || [])]
+                  .find(item => item.slug === reference || item.id === reference) || null
+              }
+              if (args.action === 'space_create') {
+                if (!args?.title) return { ok: false, error: '缺少板块名称 title' }
+                const data = await callCommunity('/api/admin/spaces', {
+                  method: 'POST',
+                  headers: userHeaders,
+                  body: JSON.stringify({
+                    title: args.title,
+                    slug: args.slug,
+                    subtitle: args.subtitle,
+                    description: args.description,
+                    accent: args.accent,
+                    accentTo: args.accentTo,
+                    motif: args.motif,
+                    zones: args.zones,
+                  }),
+                })
+                return { ok: true, space: { id: data.space.id, slug: data.space.slug, title: data.space.title } }
+              }
+              if (!args?.space) return { ok: false, error: '缺少板块 slug 或 id（参数 space）' }
+              const target = await findSpace(String(args.space))
+              if (!target) return { ok: false, error: `没有这个板块：${args.space}` }
+              if (args.action === 'space_archive') {
+                const data = await callCommunity(`/api/admin/spaces/${encodeURIComponent(target.id)}/archive`, {
+                  method: 'POST',
+                  headers: userHeaders,
+                  body: JSON.stringify({ archived: args.archived !== false }),
+                })
+                return { ok: true, space: { id: data.space.id, slug: data.space.slug, archivedAt: data.space.archivedAt } }
+              }
+              const patch = {}
+              for (const key of ['title', 'subtitle', 'description', 'accent', 'accentTo', 'motif', 'zones']) {
+                if (args[key] !== undefined) patch[key] = args[key]
+              }
+              if (!Object.keys(patch).length) return { ok: false, error: '没有要更新的字段' }
+              const data = await callCommunity(`/api/admin/spaces/${encodeURIComponent(target.id)}/update`, {
+                method: 'POST',
+                headers: userHeaders,
+                body: JSON.stringify(patch),
+              })
+              return {
+                ok: true,
+                space: { id: data.space.id, slug: data.space.slug, title: data.space.title, subtitle: data.space.subtitle, description: data.space.description },
+              }
+            }
             default:
               return { ok: false, error: `未知操作：${args?.action || '（空）'}` }
           }
@@ -483,7 +566,7 @@ async function handleChat(ctx, req, res, { ensureChatSession, chat }) {
   chat.busy = true
   try {
     const accountId = await authenticatedAccount(body?.token)
-    writeCliToken(body.token)
+    chat.saveToken?.(body.token)
 
     const ctrl = ctx.get('sessionController')
     if (!ctrl) return json(res, 503, { error: '当前环境没有会话服务' })
