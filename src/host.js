@@ -613,9 +613,16 @@ async function handleChat(ctx, req, res, { ensureChatSession, chat }) {
     })
 
     res.on('close', () => {
-      if (!turn.finished) {
-        turn.abort()
-        ctrl.cancel({ sessionId }).catch(error => ctx.logger?.warn?.(`[achoverse-community] 断开后取消失败：${error?.message}`))
+      if (turn.finished) return
+      turn.abort()
+      // cancel 是同步返回 { accepted: true } 的 Remote 方法；不能直接 .catch，
+      // 否则 close 事件里抛出的 TypeError 会变成未捕获异常，直接带走 host 进程。
+      try {
+        Promise.resolve(ctrl.cancel({ sessionId })).catch(error =>
+          ctx.logger?.warn?.(`[achoverse-community] 断开后取消失败：${error?.message}`),
+        )
+      } catch (error) {
+        ctx.logger?.warn?.(`[achoverse-community] 断开后取消失败：${error?.message}`)
       }
     })
     try {
