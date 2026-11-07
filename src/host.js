@@ -321,6 +321,26 @@ export function apply(ctx, options = {}) {
     'achoverse-community: routes',
   )
 
+  /* ---------------------------------------------------------------- 工具限制 */
+
+  // 其他插件（任务板、媒体等）注册的是全局工具，预设挡不住；这里按会话兜底拒绝。
+  const CHAT_TOOLS = new Set(['community', 'ask_user_question', 'todo_write'])
+  const toolRegistry = ctx.get('tools')
+  if (toolRegistry?.guard) {
+    ctx.effect(
+      () =>
+        toolRegistry.guard(exec => {
+          const active = chat.active
+          if (!active || !exec?.agent) return undefined
+          const agentSession = String(exec.agent.session?.id ?? exec.agent.id ?? '')
+          if (agentSession !== active.sessionId) return undefined
+          if (CHAT_TOOLS.has(String(exec.name))) return undefined
+          return `社区助手只开放 ${[...CHAT_TOOLS].join(' / ')}，不提供 ${exec.name}`
+        }),
+      'achoverse-community: tool guard',
+    )
+  }
+
   /* ---------------------------------------------------------------- 工具 */
 
   const tools = ctx.get('tools')
