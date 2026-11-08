@@ -1,27 +1,64 @@
 # Achoverse 社区 · DSH 插件
 
-在 DeepSeek Harness 里加入 Achoverse 社区：侧栏一个「社区」入口，主面板里浏览板块、帖子、评论、发帖互动；同时注册 `community` 工具，让 agent 直接读写社区数据。
+在 DeepSeek Harness 中浏览 Achoverse 社区、参与讨论，也可以让 AI 助手帮你查找帖子、整理内容和发布回复。
 
-> 本项目只是插件客户端。社区服务端（注册登录、SQLite 数据、邮件、管理后台、公网站点）是独立部署的私有服务，插件通过 HTTP 与它通信，**安装插件不需要服务端代码**。
+## 你可以做什么
 
-## 功能
+- **发现讨论**：浏览社区板块和 AR/VR 专区，查看最近更新、活跃成员，搜索感兴趣的帖子。
+- **参与交流**：发布帖子、发表评论，使用 Markdown 排版，与其他成员发送私信。
+- **管理个人资料**：设置昵称、简介和头像，管理邮箱、密码与私信接收设置。
+- **让助手帮忙**：在社区右侧打开对话抽屉，让助手查找讨论、阅读帖子和评论，或帮你发帖、回复。
+- **接着聊下去**：恢复自己账号的助手对话历史，回答助手的追问，也可以随时停止当前回复。
 
-- 侧栏入口 + 主面板：首页、板块讨论区、帖子详情与评论、发帖弹窗、搜索
-- 账号：面板内登录/注册；浏览免登录，发帖评论需登录
-- Markdown 渲染：帖子正文与 DSH 对话
-- AR/VR 主题专区
-- 右侧 DSH 抽屉：在社区里直接和 agent 对话
-- agent 工具 `community`：`spaces` / `posts` / `read_post` / `search` / `post` / `comment`
+浏览社区无需登录；发帖、评论和使用社区助手前，请先登录社区账号。管理员还可以让助手创建、调整、归档或恢复板块。
 
-## 安装
+## 安装与开始使用
 
-在 DeepSeek Harness 里用 `plugin_manager`：
+### 1. 安装插件
+
+在 DeepSeek Harness 中使用 `plugin_manager`：
 
 ```text
 plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
 ```
 
-如果你的 DSH 版本不支持 git 安装规格，先克隆到本地再按路径安装：
+安装后刷新页面，左侧栏会出现「社区」入口。
+
+### 2. 设置社区地址
+
+在 DSH 用户目录中创建或编辑 `achoverse-community.json`，添加社区地址；如果文件中已有其他设置，请保留原有字段。
+
+默认文件位置为 `~/.dsh/achoverse-community.json`；设置过 `DSH_HOME` 时，使用该目录下的同名文件。
+
+```json
+{
+  "baseUrl": "https://community.achoverse.com"
+}
+```
+
+如果此前设置过环境变量 `ACV_BASE_URL`，请同步调整该变量，它会优先于文件中的地址。
+
+### 3. 打开社区
+
+重启 DSH，点击左侧栏「社区」。看到板块列表后，就可以浏览帖子；登录或注册账号后，即可参与讨论。
+
+## 试着这样和助手说
+
+打开社区右侧的助手抽屉，输入：
+
+- 「看看社区最近有哪些新帖子。」
+- 「帮我找找关于 AR 眼镜的讨论。」
+- 「读一下这篇帖子，总结大家的观点。」
+- 「帮我在这个板块发一篇帖子，分享我的体验。」
+- 「帮我回复这篇帖子，补充一下这个思路。」
+
+发帖或回复时，请把目标板块或帖子、想表达的内容告诉助手。助手使用当前社区账号参与讨论，操作范围取决于账号权限。
+
+## 常见问题
+
+**安装命令不支持 GitHub 地址怎么办？**
+
+先克隆仓库，再在 DSH 中使用本地路径安装：
 
 ```bash
 git clone https://github.com/shlan28/dsh-achoverse-community.git
@@ -31,47 +68,15 @@ git clone https://github.com/shlan28/dsh-achoverse-community.git
 plugin_manager install_bundle target=./dsh-achoverse-community
 ```
 
-装完刷新页面，左侧栏出现「社区」入口。
+**打开社区后无法加载？**
 
-## 配置
+检查社区地址是否已保存到当前 DSH 使用的配置目录，然后重启 DSH。也可以先在浏览器中打开 [Achoverse 社区](https://community.achoverse.com)，检查是否能正常访问。
 
-插件要连到社区服务地址。按优先级：
+**发帖或回复时提示登录？**
 
-1. 环境变量 `ACV_BASE_URL`（服务地址）、`ACV_SERVICE_TOKEN`（写操作令牌）
-2. `$DSH_HOME/achoverse-community.json`：
+请在社区面板中登录；如果已经登录，退出后重新登录再试。
 
-```json
-{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<可选，写操作用>" }
-```
-
-3. 插件目录下的 `config.local.json`（同上格式，本地开发用）
-4. 都没有时回退到 `http://127.0.0.1:8088`（本地开发地址）
-
-改完配置重载插件即可（`plugin_manager` 先 `remove_bundle` 再 `install_bundle`，或重启 DSH）。
-
-## 使用
-
-- **面板**：左侧栏「社区」→ 顶部 tab 浏览首页 / AR/VR 专区，点卡片进板块与帖子。
-- **agent**：直接说「看看社区最近有什么帖子」「帮我在 tech 板块发一条」，agent 会调用 `community` 工具；发帖/评论前需要你先在面板里登录。
-
-## 目录
-
-```
-src/host.js         DSH host 半片：配置下发、抽屉对话、community 工具
-src/chat.js         抽屉对话的轮次逻辑
-dist/client.js      浏览器半片（预构建，安装时直接用）
-locale/             面板标题与描述
-cordis.patch.yml    插件装载描述
-icon.svg            侧栏图标
-docs/               安装与排错说明
-```
-
-## 文档
-
-| 文档 | 说明 |
-| --- | --- |
-| [docs/index.md](docs/index.md) | 项目结构与文档清单 |
-| [docs/install.md](docs/install.md) | 安装、配置、验证与排错 |
+更多安装方式、更新步骤和排错说明，见 [安装与配置](docs/install.md)。
 
 ## 许可
 
