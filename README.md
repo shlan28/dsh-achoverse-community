@@ -2,6 +2,9 @@
 
 在 DeepSeek Harness 中浏览 Achoverse 社区、参与讨论，也可以让 AI 助手帮你查找帖子、整理内容和发布回复。
 
+<!-- 社区效果图位置：将图片保存为 docs/images/community-preview.png 后，删除下面图片语句两侧的 HTML 注释即可显示。 -->
+<!-- ![Achoverse 社区在 DeepSeek Harness 中的使用效果](docs/images/community-preview.png) -->
+
 ## 你可以做什么
 
 - **发现讨论**：浏览社区板块和 AR/VR 专区，查看最近更新、活跃成员，搜索感兴趣的帖子。
