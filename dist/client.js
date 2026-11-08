@@ -608,9 +608,9 @@ var ta=Object.create;var me=Object.defineProperty;var na=Object.getOwnPropertyDe
 .acv-feed-head {
   display: flex;
   align-items: flex-end;
-  min-height: 68px;
+  min-height: 52px;
   padding: 0 12px 0 0;
-  background: #f3f3f7;
+  background: #fafafb;
   border-radius: var(--acv-radius) var(--acv-radius) 0 0;
 }
 
@@ -625,8 +625,8 @@ var ta=Object.create;var me=Object.defineProperty;var na=Object.getOwnPropertyDe
   position: relative;
   border: 0;
   background: transparent;
-  min-height: 68px;
-  padding: 16px 24px 26px;
+  min-height: 52px;
+  padding: 8px 24px 18px;
   font: inherit;
   font-size: 15px;
   font-weight: 700;
@@ -670,7 +670,7 @@ var ta=Object.create;var me=Object.defineProperty;var na=Object.getOwnPropertyDe
   content: '';
   position: absolute;
   left: 50%;
-  bottom: 9px;
+  bottom: 7px;
   transform: translateX(-50%);
   width: 40px;
   height: 4px;
@@ -680,7 +680,7 @@ var ta=Object.create;var me=Object.defineProperty;var na=Object.getOwnPropertyDe
 }
 
 .acv-feed-head .acv-link {
-  margin: 0 6px 26px auto;
+  margin: 0 6px 18px auto;
   flex: none;
 }
 
@@ -1442,18 +1442,18 @@ var ta=Object.create;var me=Object.defineProperty;var na=Object.getOwnPropertyDe
   }
 
   .acv-feed-tab {
-    min-height: 60px;
-    padding: 13px 18px 23px;
+    min-height: 48px;
+    padding: 7px 18px 15px;
     font-size: 14px;
   }
 
   .acv-feed-head {
-    min-height: 60px;
+    min-height: 48px;
     padding: 0 8px 0 0;
   }
 
   .acv-feed-head .acv-link {
-    margin-bottom: 22px;
+    margin-bottom: 15px;
   }
 
   .acv-feed-body {
