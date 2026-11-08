@@ -34,7 +34,10 @@
     "locale",
     "icon.svg",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "docs/index.md",
+    "docs/install.md",
+    "docs/images/community-preview.png"
   ],
   "keywords": [
     "dsh",
@@ -43,5 +46,13 @@
     "community",
     "achoverse"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shlan28/dsh-achoverse-community.git"
+  },
+  "homepage": "https://github.com/shlan28/dsh-achoverse-community#readme",
+  "bugs": {
+    "url": "https://github.com/shlan28/dsh-achoverse-community/issues"
+  }
 }

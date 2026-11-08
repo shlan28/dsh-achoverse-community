@@ -2,7 +2,9 @@
 
 ## 1. 安装
 
-DeepSeek Harness 里用 `plugin_manager`：
+推荐在 DeepSeek Harness 的插件安装入口选择 npm 包安装，输入包名 **`dsh-achoverse-community`**。
+
+也可以使用 `plugin_manager` 从 GitHub 安装：
 
 ```text
 plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community

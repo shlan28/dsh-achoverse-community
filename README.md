@@ -18,11 +18,13 @@
 
 ### 1. 安装插件
 
-在 DeepSeek Harness 中使用 `plugin_manager`：
+推荐通过 **npm 包安装**：在 DeepSeek Harness 的插件安装入口选择 npm 包安装，输入以下包名：
 
 ```text
-plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
+dsh-achoverse-community
 ```
+
+安装的是插件，请在 DSH 的插件安装入口操作。
 
 安装后刷新页面，左侧栏会出现「社区」入口。
 
@@ -58,9 +60,15 @@ plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
 
 ## 常见问题
 
-**安装命令不支持 GitHub 地址怎么办？**
+**想通过 GitHub 或本地目录安装？**
 
-先克隆仓库，再在 DSH 中使用本地路径安装：
+可以在 DSH 中使用 `plugin_manager` 从 GitHub 安装：
+
+```text
+plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
+```
+
+也可以先克隆仓库，再使用本地路径安装：
 
 ```bash
 git clone https://github.com/shlan28/dsh-achoverse-community.git
