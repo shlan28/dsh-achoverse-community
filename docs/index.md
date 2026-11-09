@@ -6,6 +6,7 @@
 
 | 文档 | 说明 |
 | --- | --- |
+| [release.md](release.md) | Git/npm 发布、发布后手动触发 npmmirror 同步与验证 |
 | [install.md](install.md) | 安装、配置、验证与排错 |
 | [../README.md](../README.md) | 项目简介、功能、安装入口 |
 
