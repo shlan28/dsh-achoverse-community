@@ -71,3 +71,9 @@ plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
 ```
 
 浏览器半片支持热重载；host 半片改动需要重装或重启 DSH。
+
+### 更新至 0.1.2
+
+npm 安装用户：在 DSH 插件管理界面更新或重新安装 `dsh-achoverse-community`，目标版本为 0.1.2，然后重载插件。Git 安装用户：更新 `github:shlan28/dsh-achoverse-community`，或按上方移除/安装步骤重新安装。只刷新社区网站无法替换本地插件里的预构建脚本。
+
+验证发帖正文和评论输入框存在「表情」入口，插入后直接显示海豚图片，无独立内容预览。48 张图片由所连接的社区服务提供，自建服务需同时部署对应资源。
