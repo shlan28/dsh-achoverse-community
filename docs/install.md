@@ -83,3 +83,11 @@ npm 安装用户：在 DSH 插件管理界面更新或重新安装 `dsh-achovers
 npm 安装用户：在 DSH 插件管理界面更新或重新安装 `dsh-achoverse-community`，选择 0.1.3，再重载插件。Git 安装用户：更新 `github:shlan28/dsh-achoverse-community` 后重载。
 
 进入「3D空间」应只看到海边的尖顶小屋卡片，封面铺满、比例 4:3；点击进入全屏场景，返回按钮或 Esc 可回到列表。空间引擎和图片由配置的社区服务提供，自建服务需部署对应 Web3D 资源。正式社区已部署；固定路径资源缓存可能持续一小时。
+
+### 更新至 0.1.4
+
+在 DSH 插件管理中更新或重新安装 `dsh-achoverse-community@0.1.4`，然后重载插件。Git 安装更新 `github:shlan28/dsh-achoverse-community` 后也需重载。
+
+进入「3D空间」→ 海边的尖顶小屋，点击空中的云朵即可选择木牌并留言。每账号只放一次，已有木牌会进入编辑自己的留言；管理员可以删除。右上角没有额外的留言按钮。留言由社区服务保存，和网站一致。
+
+自建服务需先部署留言 HTTP 接口、数据库 v9、`/assets/world.js?v=messages-2` 以及 `/worlds/seaside-chapel/wood-oak.webp`、`cloud-soft.png`；默认正式社区已经更新。只刷新网站不会更新插件内的客户端脚本。
