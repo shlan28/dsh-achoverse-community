@@ -77,3 +77,9 @@ plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
 npm 安装用户：在 DSH 插件管理界面更新或重新安装 `dsh-achoverse-community`，目标版本为 0.1.2，然后重载插件。Git 安装用户：更新 `github:shlan28/dsh-achoverse-community`，或按上方移除/安装步骤重新安装。只刷新社区网站无法替换本地插件里的预构建脚本。
 
 验证发帖正文和评论输入框存在「表情」入口，插入后直接显示海豚图片，无独立内容预览。48 张图片由所连接的社区服务提供，自建服务需同时部署对应资源。
+
+### 更新至 0.1.3
+
+npm 安装用户：在 DSH 插件管理界面更新或重新安装 `dsh-achoverse-community`，选择 0.1.3，再重载插件。Git 安装用户：更新 `github:shlan28/dsh-achoverse-community` 后重载。
+
+进入「3D空间」应只看到海边的尖顶小屋卡片，封面铺满、比例 4:3；点击进入全屏场景，返回按钮或 Esc 可回到列表。空间引擎和图片由配置的社区服务提供，自建服务需部署对应 Web3D 资源。正式社区已部署；固定路径资源缓存可能持续一小时。
