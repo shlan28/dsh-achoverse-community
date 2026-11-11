@@ -28,12 +28,15 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 
 ## 2. 配置社区地址
 
+插件随包提供 `config.json`，内容仅为公开社区地址，正式社区安装即用，无需另外创建配置。自建社区请使用下表中更高优先级的覆盖方式。
+
 | 优先级 | 来源 | 用途 |
 | --- | --- | --- |
 | 1 | 环境变量 `ACV_BASE_URL` / `ACV_SERVICE_TOKEN` | CI、命令行启动 |
 | 2 | `$DSH_HOME/achoverse-community.json` | 桌面版推荐 |
 | 3 | 插件目录 `config.local.json` | 本地开发 |
-| 4 | 默认 `http://127.0.0.1:8088` | 本机起服务时 |
+| 4 | 插件目录 `config.json` | 随包提供，仅含公开的正式社区地址 |
+| 5 | 内置 `https://community.achoverse.com` | 公开配置缺失或损坏时兜底 |
 
 配置文件格式：
 
@@ -42,6 +45,7 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 ```
 
 - `baseUrl`：社区服务地址，结尾不要带 `/`（带了也会被去掉）。
+- 默认用户级文件为 `~/.dsh/achoverse-community.json`；设置了 `DSH_HOME` 时改用该目录。推荐把自建地址写在这里，升级不会覆盖它。不要把服务令牌写进公开 `config.json` 或提交到仓库。
 - `serviceToken`：服务端 `ACV_SERVICE_TOKEN` 对应的令牌，写操作与抽屉对话会带上它。没有令牌时，写操作需要用户在面板里登录。
 
 改完配置需要重载插件：`plugin_manager remove_bundle` 再 `install_bundle`，或重启 DSH。host 半片每次请求都重新读配置，改文件后新请求即生效。
@@ -57,7 +61,7 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
-| 面板空白、控制台报错连 `127.0.0.1:8088` | 没配置地址，回退到默认值 | 配 `ACV_BASE_URL` 或 `$DSH_HOME/achoverse-community.json` |
+| 面板空白、控制台报错连 `127.0.0.1:8088` | 旧版默认地址或残留的显式覆盖 | 0.1.5 可用用户级文件填入正式地址；修复版默认正式社区，仍需检查旧的 `ACV_BASE_URL` 与用户文件覆盖 |
 | 面板能看，发帖报「请先登录」 | 未登录或令牌过期 | 面板里登录；或配置 `serviceToken` |
 | agent 工具报「用户还没在社区面板里登录」 | 写操作按会话绑定账号 | 先在面板登录，再让 agent 写 |
 | 404 `/community/config` | 插件未加载成功 | 检查 `plugin_manager list_plugins`，重装插件 |

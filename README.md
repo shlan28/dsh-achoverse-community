@@ -28,9 +28,11 @@ dsh-achoverse-community
 
 安装后刷新页面，左侧栏会出现「社区」入口。
 
-### 2. 设置社区地址
+### 2. 社区地址（默认已配置）
 
-在 DSH 用户目录中创建或编辑 `achoverse-community.json`，添加社区地址；如果文件中已有其他设置，请保留原有字段。
+插件随包附带 `config.json`，默认连接 `https://community.achoverse.com`，使用正式社区无需手动创建配置。
+
+连接自建社区或覆盖地址时，在 DSH 用户目录中创建或编辑 `achoverse-community.json`；如果文件中已有其他设置，请保留原有字段。建议使用用户级文件，避免升级覆盖包目录内的改动。
 
 默认文件位置为 `~/.dsh/achoverse-community.json`；设置过 `DSH_HOME` 时，使用该目录下的同名文件。
 

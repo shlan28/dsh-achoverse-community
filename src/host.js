@@ -5,7 +5,7 @@
 //   4. 系统提示里加一段，说明社区的存在
 //
 // 环境变量：
-//   ACV_BASE_URL      社区地址，默认 http://127.0.0.1:8088
+//   ACV_BASE_URL      社区地址，默认 https://community.achoverse.com
 //   ACV_SERVICE_TOKEN 社区服务令牌（写操作、绑定会话都要用）
 //   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken }
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -26,12 +26,14 @@ function env(name, fallback = '') {
  *   1. 环境变量 ACV_BASE_URL / ACV_SERVICE_TOKEN
  *   2. 包目录下的 config.local.json，或 $DSH_HOME/achoverse-community.json
  *      → { "baseUrl": "...", "serviceToken": "..." }（后者优先）
- *   3. 内置默认值
+ *   3. 包目录下的公开 config.json（只提供默认地址，不含令牌）
+ *   4. 正式社区内置默认值
  * 桌面版从 GUI 启动时没有自定义环境变量，所以第 2 条是主要通道。
  */
 function readJsonFile(file) {
   try {
-    return JSON.parse(readFileSync(file, 'utf8'))
+    const value = JSON.parse(readFileSync(file, 'utf8'))
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
   } catch {
     return {}
   }
@@ -39,10 +41,12 @@ function readJsonFile(file) {
 
 function pluginConfig() {
   const home = process.env.DSH_HOME || join(homedir(), '.dsh')
-  const packageConfig = join(dirname(fileURLToPath(import.meta.url)), '..', 'config.local.json')
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const packageConfig = join(packageRoot, 'config.local.json')
+  const defaults = readJsonFile(join(packageRoot, 'config.json'))
   const file = { ...readJsonFile(packageConfig), ...readJsonFile(join(home, 'achoverse-community.json')) }
   return {
-    baseUrl: String(env('ACV_BASE_URL', file.baseUrl || 'http://127.0.0.1:8088')).replace(/\/$/, ''),
+    baseUrl: String(env('ACV_BASE_URL', file.baseUrl || defaults.baseUrl || 'https://community.achoverse.com')).replace(/\/$/, ''),
     serviceToken: String(env('ACV_SERVICE_TOKEN', file.serviceToken || '')),
     agentPreset: String(file.agentPreset || '').trim(),
   }
