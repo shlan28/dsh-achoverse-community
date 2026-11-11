@@ -69,6 +69,14 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 
 ## 5. 更新插件
 
+### 更新至 0.1.6
+
+在 DSH 插件管理中更新或重装 `dsh-achoverse-community@0.1.6`，然后重载插件或重启 DSH。Git 安装用户更新独立仓后也需要重载。
+
+本版随包提供 `config.json`，默认地址 `https://community.achoverse.com`；host 内置兜底也为正式地址。新安装无需手动配置。升级不会替换你在用户目录配置的地址；如果仍连接 `127.0.0.1:8088`，检查 `ACV_BASE_URL`、用户级配置和包内 `config.local.json`。
+
+打开任意帖子，右上角图片图标进入海报弹窗；登录后可选六种样式，编辑文字实时预览并保存 PNG。标签默认来自板块名称，可自行编辑或清空。自建服务需提供 `/fonts/noto-sans-sc-v1.woff2`；正式社区已部署。手机和部分宿主可长按原图保存，宿主无法下载时请在浏览器打开社区。
+
 ```text
 plugin_manager remove_bundle <entry-id>
 plugin_manager install_bundle target=github:shlan28/dsh-achoverse-community
