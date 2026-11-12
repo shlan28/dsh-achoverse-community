@@ -39,12 +39,17 @@ function readJsonFile(file) {
   }
 }
 
-function pluginConfig() {
+/** 用户级配置文件的绝对路径；升级不会覆盖，提示里也用它指路。 */
+function configFile() {
   const home = process.env.DSH_HOME || join(homedir(), '.dsh')
+  return join(home, 'achoverse-community.json')
+}
+
+function pluginConfig() {
   const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
   const packageConfig = join(packageRoot, 'config.local.json')
   const defaults = readJsonFile(join(packageRoot, 'config.json'))
-  const file = { ...readJsonFile(packageConfig), ...readJsonFile(join(home, 'achoverse-community.json')) }
+  const file = { ...readJsonFile(packageConfig), ...readJsonFile(configFile()) }
   return {
     baseUrl: String(env('ACV_BASE_URL', file.baseUrl || defaults.baseUrl || 'https://community.achoverse.com')).replace(/\/$/, ''),
     serviceToken: String(env('ACV_SERVICE_TOKEN', file.serviceToken || '')),
@@ -592,6 +597,13 @@ async function handleChat(ctx, req, res, { ensureChatSession, chat }) {
   const body = await readJson(req)
   const message = String(body?.message || '').trim()
   if (!message) return json(res, 400, { error: '消息不能为空' })
+  // 绑定接口只认服务令牌；缺令牌时先给本地配置提示，不要把服务端 403 原样透传。
+  if (!pluginConfig().serviceToken) {
+    return json(res, 500, {
+      error: `插件未配置服务令牌，抽屉对话无法绑定会话。请在 ${configFile()} 中填写 serviceToken（与社区服务端的 ACV_SERVICE_TOKEN 一致），或设置环境变量 ACV_SERVICE_TOKEN 后重试。`,
+      code: 'service_token_missing',
+    })
+  }
   if (chat.busy) return json(res, 409, { error: '上一轮对话尚未结束' })
   chat.busy = true
   try {

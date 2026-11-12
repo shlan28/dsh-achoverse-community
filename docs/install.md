@@ -41,14 +41,15 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 配置文件格式：
 
 ```json
-{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<可选>" }
+{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<服务端同名令牌>" }
 ```
 
 - `baseUrl`：社区服务地址，结尾不要带 `/`（带了也会被去掉）。
 - 默认用户级文件为 `~/.dsh/achoverse-community.json`；设置了 `DSH_HOME` 时改用该目录。推荐把自建地址写在这里，升级不会覆盖它。不要把服务令牌写进公开 `config.json` 或提交到仓库。
-- `serviceToken`：服务端 `ACV_SERVICE_TOKEN` 对应的令牌，写操作与抽屉对话会带上它。没有令牌时，写操作需要用户在面板里登录。
+- `serviceToken`：服务端 `ACV_SERVICE_TOKEN` 对应的令牌。**社区助手抽屉对话必须配置**：绑定会话的接口只接受服务令牌，缺令牌时对话会直接报「插件未配置服务令牌」（旧版为服务端返回的「只有服务令牌可以绑定会话」）。agent 的读写仍以面板登录的账号身份执行，服务令牌只用于插件内部绑定与会话归属查询，不会下发给浏览器。
+- 升级或重装会整体替换插件包目录，包内私人 `config.local.json` 及其中的令牌不会保留；地址与令牌请放在用户级文件里，升级不会覆盖。
 
-改完配置需要重载插件：`plugin_manager remove_bundle` 再 `install_bundle`，或重启 DSH。host 半片每次请求都重新读配置，改文件后新请求即生效。
+改完配置不需要重载：host 半片每次请求都重新读配置，改文件后新请求立即生效。只有更换插件版本（浏览器半片或 host 代码更新）时才需要 `plugin_manager remove_bundle` 再 `install_bundle`，或重启 DSH。
 
 ## 3. 验证
 
@@ -64,6 +65,7 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 | 面板空白、控制台报错连 `127.0.0.1:8088` | 旧版默认地址或残留的显式覆盖 | 0.1.5 可用用户级文件填入正式地址；修复版默认正式社区，仍需检查旧的 `ACV_BASE_URL` 与用户文件覆盖 |
 | 面板能看，发帖报「请先登录」 | 未登录或令牌过期 | 面板里登录；或配置 `serviceToken` |
 | agent 工具报「用户还没在社区面板里登录」 | 写操作按会话绑定账号 | 先在面板登录，再让 agent 写 |
+| 抽屉对话报「插件未配置服务令牌」（旧版报「只有服务令牌可以绑定会话」） | 服务令牌缺失，常见于升级或重装后包内私人配置丢失 | 按「2. 配置社区地址」在用户级文件补 `serviceToken`，直接重发消息，不需要重载 |
 | 404 `/community/config` | 插件未加载成功 | 检查 `plugin_manager list_plugins`，重装插件 |
 | 跨域报错 | 前端请求发到了别的地址 | 确认 `baseUrl` 与浏览器访问的地址同源策略允许，必要时服务端配 `ACV_ALLOWED_ORIGINS` |
 
@@ -74,6 +76,8 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 在 DSH 插件管理中更新或重装 `dsh-achoverse-community@0.1.6`，然后重载插件或重启 DSH。Git 安装用户更新独立仓后也需要重载。
 
 本版随包提供 `config.json`，默认地址 `https://community.achoverse.com`；host 内置兜底也为正式地址。新安装无需手动配置。升级不会替换你在用户目录配置的地址；如果仍连接 `127.0.0.1:8088`，检查 `ACV_BASE_URL`、用户级配置和包内 `config.local.json`。
+
+重装会替换整个插件目录：包内 `config.local.json` 及其中令牌不会保留。升级后若抽屉对话提示未配置服务令牌，按「2. 配置社区地址」在用户级文件补上 `serviceToken`。
 
 打开任意帖子，右上角图片图标进入海报弹窗；登录后可选六种样式，编辑文字实时预览并保存 PNG。标签默认来自板块名称，可自行编辑或清空。自建服务需提供 `/fonts/noto-sans-sc-v1.woff2`；正式社区已部署。手机和部分宿主可长按原图保存，宿主无法下载时请在浏览器打开社区。
 
