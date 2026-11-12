@@ -41,13 +41,13 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 配置文件格式：
 
 ```json
-{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<服务端同名令牌>" }
+{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<可选：自建/CLI>" }
 ```
 
 - `baseUrl`：社区服务地址，结尾不要带 `/`（带了也会被去掉）。
 - 默认用户级文件为 `~/.dsh/achoverse-community.json`；设置了 `DSH_HOME` 时改用该目录。推荐把自建地址写在这里，升级不会覆盖它。不要把服务令牌写进公开 `config.json` 或提交到仓库。
-- `serviceToken`：服务端 `ACV_SERVICE_TOKEN` 对应的令牌。**社区助手抽屉对话必须配置**：绑定会话的接口只接受服务令牌，缺令牌时对话会直接报「插件未配置服务令牌」（旧版为服务端返回的「只有服务令牌可以绑定会话」）。agent 的读写仍以面板登录的账号身份执行，服务令牌只用于插件内部绑定与会话归属查询，不会下发给浏览器。
-- 升级或重装会整体替换插件包目录，包内私人 `config.local.json` 及其中的令牌不会保留；地址与令牌请放在用户级文件里，升级不会覆盖。
+- `serviceToken`：**可选**。抽屉对话与 agent 写操作只需要在社区面板登录，使用你自己的登录令牌；只有自建服务、`acv` CLI 或 0.1.6 及以前的旧版插件才需要服务端同名令牌。不要写进公开 `config.json` 或提交到仓库。
+- 登录令牌与抽屉会话映射存放在用户目录：`$DSH_HOME/achoverse-community-token`、`$DSH_HOME/achoverse-community-sessions.json`（0600）。升级或重装不会覆盖；旧版写在插件包目录的 `.acv-cli-token` 只会被兼容读取一次。
 
 改完配置不需要重载：host 半片每次请求都重新读配置，改文件后新请求立即生效。只有更换插件版本（浏览器半片或 host 代码更新）时才需要 `plugin_manager remove_bundle` 再 `install_bundle`，或重启 DSH。
 
@@ -63,13 +63,23 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | 面板空白、控制台报错连 `127.0.0.1:8088` | 旧版默认地址或残留的显式覆盖 | 0.1.5 可用用户级文件填入正式地址；修复版默认正式社区，仍需检查旧的 `ACV_BASE_URL` 与用户文件覆盖 |
-| 面板能看，发帖报「请先登录」 | 未登录或令牌过期 | 面板里登录；或配置 `serviceToken` |
+| 面板能看，发帖报「请先登录」 | 未登录或令牌过期 | 面板里登录后重试 |
 | agent 工具报「用户还没在社区面板里登录」 | 写操作按会话绑定账号 | 先在面板登录，再让 agent 写 |
-| 抽屉对话报「插件未配置服务令牌」（旧版报「只有服务令牌可以绑定会话」） | 服务令牌缺失，常见于升级或重装后包内私人配置丢失 | 按「2. 配置社区地址」在用户级文件补 `serviceToken`，直接重发消息，不需要重载 |
+| 抽屉对话报「请先在社区面板登录」 | 尚未登录或令牌过期 | 在社区面板登录后重发消息，不需要重载 |
+| 抽屉对话报「只有服务令牌可以绑定会话」 | 服务端还没升级到支持用户令牌绑定的版本 | 先升级社区服务端，再升级插件到 0.1.7 |
+| CLI 或旧版提示没有登录令牌 | 0.1.6 及以前把令牌放在插件包目录，升级会丢 | 升级到 0.1.7 后在面板登录一次，或运行 `acv login` |
 | 404 `/community/config` | 插件未加载成功 | 检查 `plugin_manager list_plugins`，重装插件 |
 | 跨域报错 | 前端请求发到了别的地址 | 确认 `baseUrl` 与浏览器访问的地址同源策略允许，必要时服务端配 `ACV_ALLOWED_ORIGINS` |
 
 ## 5. 更新插件
+
+### 更新至 0.1.7
+
+抽屉助手不再要求配置服务令牌：只需要在社区面板登录。绑定与归属查询都使用你自己的登录令牌，服务端不会接受用请求体指定别人的账户。
+
+登录令牌、抽屉会话映射改存用户目录（`~/.dsh/achoverse-community-token`、`~/.dsh/achoverse-community-sessions.json`，0600），升级重装不再丢失；旧版包目录里的 `.acv-cli-token` 只做一次兼容读取。面板登录、退出、切换账号时会自动同步落盘令牌，非抽屉会话只使用当前登录账号的令牌。
+
+服务端需先升级到支持用户令牌绑定的版本。插件与旧服务端搭配时，对话会报「只有服务令牌可以绑定会话」。
 
 ### 更新至 0.1.6
 
@@ -77,7 +87,7 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 
 本版随包提供 `config.json`，默认地址 `https://community.achoverse.com`；host 内置兜底也为正式地址。新安装无需手动配置。升级不会替换你在用户目录配置的地址；如果仍连接 `127.0.0.1:8088`，检查 `ACV_BASE_URL`、用户级配置和包内 `config.local.json`。
 
-重装会替换整个插件目录：包内 `config.local.json` 及其中令牌不会保留。升级后若抽屉对话提示未配置服务令牌，按「2. 配置社区地址」在用户级文件补上 `serviceToken`。
+重装会替换整个插件目录。0.1.7 起登录令牌与会话映射已移到用户目录，升级不再丢失；旧版包内 `.acv-cli-token` 只做兼容读取。
 
 打开任意帖子，右上角图片图标进入海报弹窗；登录后可选六种样式，编辑文字实时预览并保存 PNG。标签默认来自板块名称，可自行编辑或清空。自建服务需提供 `/fonts/noto-sans-sc-v1.woff2`；正式社区已部署。手机和部分宿主可长按原图保存，宿主无法下载时请在浏览器打开社区。
 

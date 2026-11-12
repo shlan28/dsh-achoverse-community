@@ -30,13 +30,13 @@ docs/               安装与排错说明
 - 浏览器半片连哪个地址由 host 半片下发：面板启动时请求 `/community/config`，取 `baseUrl`。
 - `dist/client.js` 是预构建产物，公开仓库不含前端源码；需要改面板样式/组件时在私有服务端仓库构建后同步，见私有仓库 `scripts/sync-plugin.mjs`。
 
-## 未发布修复：抽屉对话缺服务令牌提示
+## 0.1.7 更新：助手对话不再依赖服务令牌
 
-升级或重装会整体替换插件包目录，包内私人 `config.local.json` 里的服务令牌不会保留。缺少服务令牌时，抽屉对话的绑定请求没有 `Authorization`，旧版会把服务端 403「只有服务令牌可以绑定会话」原样抛给用户。
+抽屉助手只需要社区面板登录：绑定与归属查询使用当前用户自己的登录令牌，服务端不接受请求体指定别人的账户（跨账号绑定直接 403）。服务令牌保留给自建服务、`acv` CLI 与旧版插件，不再是终端用户的配置项；安装文档里的必填说明与本地预检一并移除。
 
-host 现在在占用会话前先检查配置：缺 `serviceToken` 时直接返回 `service_token_missing`，提示里给出用户级配置文件路径（`$DSH_HOME/achoverse-community.json`，默认 `~/.dsh/achoverse-community.json`）和 `ACV_SERVICE_TOKEN` 覆盖方式，并且不请求社区。安装文档同步写明抽屉对话必须配置服务令牌，补充排错行与升级提醒。
+登录令牌与抽屉会话映射从插件包目录移到用户目录（`$DSH_HOME/achoverse-community-token`、`$DSH_HOME/achoverse-community-sessions.json`，0600），升级重装不再丢失；旧的 `.acv-cli-token` 只做一次兼容读取。面板登录、退出、切换账号时自动同步令牌，退出即删除；非抽屉会话只使用当前登录账号的令牌，账号不一致时拒绝写。
 
-本修复尚未发布 npm；发布时随下一 patch 版本提供。
+服务端需先升级到支持用户令牌绑定的版本。本版尚未发布 npm 与镜像，发布时按 `docs/release.md` 执行。
 
 ## 0.1.6 更新：海报与正式地址
 

@@ -6,9 +6,10 @@
 //
 // 环境变量：
 //   ACV_BASE_URL      社区地址，默认 https://community.achoverse.com
-//   ACV_SERVICE_TOKEN 社区服务令牌（写操作、绑定会话都要用）
-//   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken }
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+//   ACV_SERVICE_TOKEN 可选服务令牌；抽屉对话用登录用户自己的令牌，只有自建/CLI/旧版需要
+//   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken?, agentPreset? }
+//   登录令牌与会话映射存在 $DSH_HOME/achoverse-community-token / -sessions.json
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -68,38 +69,88 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
-/** 最近一次在抽屉登录的账号令牌；CLI 与任意 DSH 会话的写操作共用。 */
-function readAgentToken() {
-  if (process.env.ACV_TOKEN) return process.env.ACV_TOKEN.trim() || null
-  try {
-    return readFileSync(cliTokenFile(), 'utf8').trim() || null
-  } catch {
-    return null
-  }
+/** 用户级状态文件：升级或重装会整体替换插件包目录，所以不能写在包里。 */
+function homeFile(name) {
+  const home = process.env.DSH_HOME || join(homedir(), '.dsh')
+  return join(home, name)
 }
 
-/** 把当前登录令牌写到插件目录，供 acv CLI 使用（0600，不进仓库）。 */
-function cliTokenFile() {
+function tokenFile() {
+  return homeFile('achoverse-community-token')
+}
+
+/** 旧版本把令牌写在插件包目录，升级会丢；读取时兼容并迁移。 */
+function legacyTokenFile() {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '.acv-cli-token')
 }
 
-function writeCliToken(token) {
+/**
+ * 落盘令牌：新位置为 JSON `{ accountId, token }`（0600），兼容旧的纯文本文件。
+ * CLI 与任意 DSH 会话共用它，但写入时必须带上账户，读回时用于身份一致性校验。
+ */
+function readTokenFile() {
+  if (process.env.ACV_TOKEN) return { accountId: null, token: process.env.ACV_TOKEN.trim() || null, source: 'env' }
+  for (const file of [tokenFile(), legacyTokenFile()]) {
+    let text = ''
+    try {
+      text = readFileSync(file, 'utf8').trim()
+    } catch {
+      continue
+    }
+    if (!text) continue
+    if (text.startsWith('{')) {
+      try {
+        const data = JSON.parse(text)
+        if (data && typeof data.token === 'string' && data.token) {
+          return { accountId: typeof data.accountId === 'string' ? data.accountId : null, token: data.token, source: 'file' }
+        }
+      } catch {
+        // 坏 JSON 按纯文本处理
+      }
+    }
+    return { accountId: null, token: text, source: 'file' }
+  }
+  return null
+}
+
+function writeTokenFile({ accountId, token }) {
   try {
-    writeFileSync(cliTokenFile(), String(token), { mode: 0o600 })
+    writeFileSync(tokenFile(), JSON.stringify({ accountId, token }), { mode: 0o600 })
   } catch {
     // 写不进去时 CLI 仍可用 ACV_TOKEN
+  }
+}
+
+function clearTokenFile() {
+  try {
+    rmSync(tokenFile(), { force: true })
+  } catch {
+    // 忽略
   }
 }
 
 /** 按社区账户保存抽屉的 DSH 会话；旧的共享会话不自动归属给任何账户。 */
 
 function chatSessionsFile() {
+  return homeFile('achoverse-community-sessions.json')
+}
+
+function legacyChatSessionsFile() {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '.chat-sessions.json')
 }
 
 function readChatSessions() {
+  let raw = null
+  for (const file of [chatSessionsFile(), legacyChatSessionsFile()]) {
+    try {
+      raw = readFileSync(file, 'utf8')
+      break
+    } catch {
+      // 试下一个位置
+    }
+  }
   try {
-    const data = JSON.parse(readFileSync(chatSessionsFile(), 'utf8'))
+    const data = JSON.parse(raw)
     if (!data || typeof data !== 'object' || Array.isArray(data)) return {}
     const out = {}
     for (const [accountId, value] of Object.entries(data)) {
@@ -183,8 +234,8 @@ export function apply(ctx, options = {}) {
     creating: null,
     active: null,
     busy: false,
-    // 测试可关掉令牌落盘，避免把假令牌写进插件目录
-    saveToken: options.saveCliToken ?? writeCliToken,
+    // 测试可关掉令牌落盘，避免把假令牌写进用户目录
+    saveToken: options.saveToken ?? options.saveCliToken ?? ((token, accountId) => writeTokenFile({ accountId, token })),
   }
 
   function sessionController() {
@@ -240,22 +291,32 @@ export function apply(ctx, options = {}) {
     }
   }
 
-  async function userTokenFor(sessionId) {
-    const active = chat.active
-    if (!active || active.sessionId !== sessionId) return null
-    const data = await callCommunity(`/api/ai/actor?sessionId=${encodeURIComponent(sessionId)}`)
-    return data.accountId === active.accountId ? active.token : null
-  }
-
-  /** 当前轮次的令牌 → 本机缓存令牌；后者让任意 DSH 会话也能以用户身份写。 */
+  /**
+   * 写操作以谁的身份执行：
+   *   - 抽屉当前轮次：只用该轮次登录用户的令牌，归属校验失败就拒绝，不退回缓存；
+   *   - 其他 DSH 会话：只用「当前面板登录账号」的缓存令牌，账号对不上就拒绝。
+   */
   async function writeTokenFor(sessionId) {
-    const scoped = sessionId ? await userTokenFor(sessionId) : null
-    if (scoped) return scoped
-    const cached = readAgentToken()
-    if (!cached) return null
+    const active = chat.active
+    if (active && sessionId && String(sessionId) === active.sessionId) {
+      try {
+        const data = await callCommunity(`/api/ai/actor?sessionId=${encodeURIComponent(active.sessionId)}`, {
+          headers: { authorization: `Bearer ${active.token}` },
+        })
+        return data?.accountId === active.accountId ? active.token : null
+      } catch {
+        return null
+      }
+    }
+    const cached = readTokenFile()
+    if (!cached?.token) return null
     try {
-      const me = await callCommunity('/api/auth/me', { headers: { authorization: `Bearer ${cached}` } })
-      return me?.account?.id ? cached : null
+      const me = await callCommunity('/api/auth/me', { headers: { authorization: `Bearer ${cached.token}` } })
+      const accountId = me?.account?.id
+      if (!accountId) return null
+      if (cached.accountId && cached.accountId !== accountId) return null
+      if (!cached.accountId && cached.source === 'file') writeTokenFile({ accountId, token: cached.token })
+      return cached.token
     } catch {
       return null
     }
@@ -309,6 +370,17 @@ export function apply(ctx, options = {}) {
 
             if (route === '/config' && req.method === 'GET') {
               return json(res, 200, { baseUrl: baseUrl() })
+            }
+            if (route === '/ai/token' && req.method === 'POST') {
+              const body = await readJson(req)
+              const token = typeof body?.token === 'string' ? body.token.trim() : ''
+              if (!token) {
+                clearTokenFile()
+                return json(res, 200, { ok: true, tokenSaved: false })
+              }
+              const accountId = await authenticatedAccount(token)
+              writeTokenFile({ accountId, token })
+              return json(res, 200, { ok: true, tokenSaved: true })
             }
             if (route === '/ai/history' && req.method === 'GET') {
               const header = String(req.headers.authorization || '')
@@ -597,27 +669,21 @@ async function handleChat(ctx, req, res, { ensureChatSession, chat }) {
   const body = await readJson(req)
   const message = String(body?.message || '').trim()
   if (!message) return json(res, 400, { error: '消息不能为空' })
-  // 绑定接口只认服务令牌；缺令牌时先给本地配置提示，不要把服务端 403 原样透传。
-  if (!pluginConfig().serviceToken) {
-    return json(res, 500, {
-      error: `插件未配置服务令牌，抽屉对话无法绑定会话。请在 ${configFile()} 中填写 serviceToken（与社区服务端的 ACV_SERVICE_TOKEN 一致），或设置环境变量 ACV_SERVICE_TOKEN 后重试。`,
-      code: 'service_token_missing',
-    })
-  }
   if (chat.busy) return json(res, 409, { error: '上一轮对话尚未结束' })
   chat.busy = true
   try {
     const accountId = await authenticatedAccount(body?.token)
-    chat.saveToken?.(body.token)
+    chat.saveToken?.(body.token, accountId)
 
     const ctrl = ctx.get('sessionController')
     if (!ctrl) return json(res, 503, { error: '当前环境没有会话服务' })
 
     const sessionId = await ensureChatSession(accountId)
+    // 账户由登录令牌决定，请求体不传 userToken，杜绝用别人的令牌绑自己。
     await callCommunity('/api/ai/bind', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, userToken: body.token }),
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${body.token}` },
+      body: JSON.stringify({ sessionId }),
     })
 
     res.writeHead(200, {
