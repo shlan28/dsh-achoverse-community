@@ -6,9 +6,9 @@
 //
 // 环境变量：
 //   ACV_BASE_URL      社区地址，默认 https://community.achoverse.com
-//   ACV_SERVICE_TOKEN 可选服务令牌；抽屉对话用登录用户自己的令牌，只有自建/CLI/旧版需要
-//   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, serviceToken?, agentPreset? }
+//   也可以写在 $DSH_HOME/achoverse-community.json：{ baseUrl, agentPreset? }
 //   登录令牌与会话映射存在 $DSH_HOME/achoverse-community-token / -sessions.json
+//   服务令牌只存在于服务端（兼容旧版插件），本插件不读取，写了也不影响
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -24,10 +24,10 @@ function env(name, fallback = '') {
 
 /**
  * 配置来源（优先级从高到低）：
- *   1. 环境变量 ACV_BASE_URL / ACV_SERVICE_TOKEN
+ *   1. 环境变量 ACV_BASE_URL
  *   2. 包目录下的 config.local.json，或 $DSH_HOME/achoverse-community.json
- *      → { "baseUrl": "...", "serviceToken": "..." }（后者优先）
- *   3. 包目录下的公开 config.json（只提供默认地址，不含令牌）
+ *      → { "baseUrl": "..." }（后者优先）
+ *   3. 包目录下的公开 config.json（只提供默认地址）
  *   4. 正式社区内置默认值
  * 桌面版从 GUI 启动时没有自定义环境变量，所以第 2 条是主要通道。
  */
@@ -53,7 +53,6 @@ function pluginConfig() {
   const file = { ...readJsonFile(packageConfig), ...readJsonFile(configFile()) }
   return {
     baseUrl: String(env('ACV_BASE_URL', file.baseUrl || defaults.baseUrl || 'https://community.achoverse.com')).replace(/\/$/, ''),
-    serviceToken: String(env('ACV_SERVICE_TOKEN', file.serviceToken || '')),
     agentPreset: String(file.agentPreset || '').trim(),
   }
 }
@@ -194,9 +193,7 @@ async function readJson(req) {
 }
 
 async function callCommunity(path, init = {}) {
-  const token = pluginConfig().serviceToken
   const headers = { ...(init.headers || {}) }
-  if (token && !headers.authorization) headers.authorization = `Bearer ${token}`
   const response = await fetch(baseUrl() + path, { ...init, headers, signal: AbortSignal.timeout(12_000) })
   const text = await response.text()
   let data

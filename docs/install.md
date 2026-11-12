@@ -32,7 +32,7 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 
 | 优先级 | 来源 | 用途 |
 | --- | --- | --- |
-| 1 | 环境变量 `ACV_BASE_URL` / `ACV_SERVICE_TOKEN` | CI、命令行启动 |
+| 1 | 环境变量 `ACV_BASE_URL` | CI、命令行启动 |
 | 2 | `$DSH_HOME/achoverse-community.json` | 桌面版推荐 |
 | 3 | 插件目录 `config.local.json` | 本地开发 |
 | 4 | 插件目录 `config.json` | 随包提供，仅含公开的正式社区地址 |
@@ -41,12 +41,12 @@ plugin_manager install_bundle target=./dsh-achoverse-community
 配置文件格式：
 
 ```json
-{ "baseUrl": "https://community.achoverse.com", "serviceToken": "<可选：自建/CLI>" }
+{ "baseUrl": "https://community.achoverse.com" }
 ```
 
 - `baseUrl`：社区服务地址，结尾不要带 `/`（带了也会被去掉）。
 - 默认用户级文件为 `~/.dsh/achoverse-community.json`；设置了 `DSH_HOME` 时改用该目录。推荐把自建地址写在这里，升级不会覆盖它。不要把服务令牌写进公开 `config.json` 或提交到仓库。
-- `serviceToken`：**可选**。抽屉对话与 agent 写操作只需要在社区面板登录，使用你自己的登录令牌；只有自建服务、`acv` CLI 或 0.1.6 及以前的旧版插件才需要服务端同名令牌。不要写进公开 `config.json` 或提交到仓库。
+插件不读取服务令牌：抽屉对话与 agent 写操作只需要在社区面板登录，使用你自己的登录令牌。服务令牌只存在于服务端，用于兼容 0.1.6 及以前的旧版插件；配置里即使还留着 `serviceToken` 字段也没影响，不需要手动清理，也不会下发给浏览器。
 - 登录令牌与抽屉会话映射存放在用户目录：`$DSH_HOME/achoverse-community-token`、`$DSH_HOME/achoverse-community-sessions.json`（0600）。升级或重装不会覆盖；旧版写在插件包目录的 `.acv-cli-token` 只会被兼容读取一次。
 
 改完配置不需要重载：host 半片每次请求都重新读配置，改文件后新请求立即生效。只有更换插件版本（浏览器半片或 host 代码更新）时才需要 `plugin_manager remove_bundle` 再 `install_bundle`，或重启 DSH。
