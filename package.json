@@ -1,6 +1,6 @@
 {
   "name": "dsh-achoverse-community",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Achoverse 社区 DSH 插件：左侧栏入口 + 板块/帖子/评论面板，并让 agent 通过 community 工具读写社区。",
   "type": "module",
   "main": "./src/host.js",
